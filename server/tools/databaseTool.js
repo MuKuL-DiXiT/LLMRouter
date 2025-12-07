@@ -39,47 +39,69 @@ export const queryDatabase = async (queryType, params) => {
       const lastMonth = new Date();
       lastMonth.setMonth(lastMonth.getMonth() - 1);
       const employees = await Employee.find({ joinDate: { $gte: lastMonth } });
-      if (employees.length === 0) {
-        return 'No employees joined last month.';
-      }
-      return `${employees.length} employee(s) joined last month: ${employees.map(e => e.name).join(', ')}.`;
+      return {
+        type: 'employees_joined_last_month',
+        data: employees,
+        raw: employees.length === 0 ? 'No employees' : employees.map(e => ({ name: e.name, joinDate: e.joinDate, position: e.position }))
+      };
+    }
+
+    if (queryType === 'employees_joined_year') {
+      const year = params.year || new Date().getFullYear();
+      const startOfYear = new Date(year, 0, 1);
+      const endOfYear = new Date(year, 11, 31);
+      const employees = await Employee.find({ joinDate: { $gte: startOfYear, $lte: endOfYear } });
+      return {
+        type: 'employees_joined_year',
+        data: employees,
+        year: year,
+        raw: employees.length === 0 ? 'No employees' : employees.map(e => ({ name: e.name, joinDate: e.joinDate, position: e.position }))
+      };
     }
 
     if (queryType === 'orders_over_amount') {
       const amount = params.amount || 500;
       const orders = await Order.find({ amount: { $gt: amount } });
-      if (orders.length === 0) {
-        return `No orders found over $${amount}.`;
-      }
-      return `Found ${orders.length} order(s) over $${amount}: ${orders.map(o => `${o.orderId} ($${o.amount})`).join(', ')}.`;
+      return {
+        type: 'orders_over_amount',
+        data: orders,
+        raw: orders.length === 0 ? 'No orders' : orders.map(o => ({ orderId: o.orderId, amount: o.amount, status: o.status, customerName: o.customerName }))
+      };
     }
 
     if (queryType === 'employees_by_department') {
       const department = params.department || 'Engineering';
       const employees = await Employee.find({ department });
-      if (employees.length === 0) {
-        return `No employees found in ${department} department.`;
-      }
-      return `${employees.length} employee(s) in ${department}: ${employees.map(e => e.name).join(', ')}.`;
+      return {
+        type: 'employees_by_department',
+        data: employees,
+        raw: employees.length === 0 ? 'No employees' : employees.map(e => ({ name: e.name, position: e.position, salary: e.salary }))
+      };
     }
 
     if (queryType === 'average_salary') {
       const result = await Employee.aggregate([
-        { $group: { _id: null, avgSalary: { $avg: '$salary' } } }
+        { $group: { _id: null, avgSalary: { $avg: '$salary' }, count: { $sum: 1 } } }
       ]);
-      const avgSalary = result[0]?.avgSalary || 0;
-      return `The average salary is $${Math.round(avgSalary)}.`;
+      return {
+        type: 'average_salary',
+        data: result[0] || { avgSalary: 0, count: 0 },
+        raw: result[0] ? `Average: $${Math.round(result[0].avgSalary)}, Count: ${result[0].count}` : 'No data'
+      };
     }
 
     if (queryType === 'total_revenue') {
       const result = await Order.aggregate([
-        { $group: { _id: null, totalRevenue: { $sum: '$amount' } } }
+        { $group: { _id: null, totalRevenue: { $sum: '$amount' }, orderCount: { $sum: 1 } } }
       ]);
-      const totalRevenue = result[0]?.totalRevenue || 0;
-      return `Total revenue from all orders is $${totalRevenue}.`;
+      return {
+        type: 'total_revenue',
+        data: result[0] || { totalRevenue: 0, orderCount: 0 },
+        raw: result[0] ? `Total: $${result[0].totalRevenue}, Orders: ${result[0].orderCount}` : 'No data'
+      };
     }
 
-    return 'Database query type not recognized.';
+    return { type: 'unknown', data: null, raw: 'Query type not found' };
   } catch (error) {
     return 'Error executing database query.';
   }
