@@ -14,7 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://mukuldixit086:khatarnakkhiladi24@cluster0.dc6aanv.mongodb.net/LLMRouter';
+const MONGO_URI = process.env.MONGO_URI ;
 
 mongoose.connect(MONGO_URI).then(async () => {
   console.log('MongoDB connected');
